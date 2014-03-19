@@ -1,0 +1,173 @@
+= INSYDE多处理器支持分析 =
+== 多处理器的同步策略 == 
+=== 关键的数据结构 ===
+[1] MP_CPU_RESERVED_DATA
+    在ACPI_NVS_RAM中分配，包含了ACPI_VARIABLE_SET和MP_SYSTEM_DATA两个数据结构。是多处理器数据的贮存
+    区域。
+    typedef struct {
+        ACPI_VARIABLE_SET          AcpiVariableSet;
+        MP_SYSTEM_DATA             MPSystemData;
+        PSEUDO_DESCRIPTOR          GdtrProfile;
+        PSEUDO_DESCRIPTOR          IdtrProfile;
+        EFI_CPU_MICROCODE_HEADER*  MicrocodePointerBuffer[NUMBER_OF_MICROCODE_UPDATE + 1];
+    } MP_CPU_RESERVED_DATA;
+[2] ACPI_VARIABLE_SET
+    主要考虑到S3过程后，需要得到相应的MP数据，这个数据结构主要保存到ACPI_VARIABLE中
+    typedef struct {
+        //
+        // Acpi Related variables
+        //
+        EFI_PHYSICAL_ADDRESS  AcpiReservedMemoryBase;
+        UINT32                AcpiReservedMemorySize;
+        EFI_PHYSICAL_ADDRESS  S3ReservedLowMemoryBase;
+        EFI_PHYSICAL_ADDRESS  AcpiBootScriptTable;
+        EFI_PHYSICAL_ADDRESS  RuntimeScriptTableBase;
+        EFI_PHYSICAL_ADDRESS  AcpiFacsTable;
+        UINT64                SystemMemoryLength;
+        ACPI_CPU_DATA         AcpiCpuData;
+        //
+        // VGA OPROM to support Video Re-POST for Linux S3
+        //
+        EFI_PHYSICAL_ADDRESS  VideoOpromAddress;
+        UINT32                VideoOpromSize;
+
+        EFI_PHYSICAL_ADDRESS  MsrTableAddress; 
+        BOOLEAN                 ResetRequired; 
+        UINT32                   NumofThreading;
+        UINT32                   CountThreading;
+    } ACPI_VARIABLE_SET;
+[3] ACPI_VARIABLE_SET->ACPI_CPU_DATA
+    ACPI_VARIABLE中与CPU有关的数据
+    typedef struct {
+        BOOLEAN               APState;
+        BOOLEAN               S3BootPath;
+        EFI_PHYSICAL_ADDRESS  WakeUpBuffer;
+        EFI_PHYSICAL_ADDRESS  GdtrProfile;
+        EFI_PHYSICAL_ADDRESS  IdtrProfile;
+        EFI_PHYSICAL_ADDRESS  CpuPrivateData;
+        EFI_PHYSICAL_ADDRESS  StackAddress;
+        EFI_PHYSICAL_ADDRESS  MicrocodePointerBuffer;
+        EFI_PHYSICAL_ADDRESS  SmramBase;
+        EFI_PHYSICAL_ADDRESS  SmmStartImageBase;
+        UINT32                SmmStartImageSize;
+        UINT32                NumberOfCpus;
+        UINT32                ApInitDone;
+    } ACPI_CPU_DATA;
+[4] MP_SYSTEM_DATA
+    BSP和AP之间主要的同步数据结构，并记录MP数据信息
+    typedef struct {
+        UINT8                       APSerializeLock;    // MP之间的同步锁
+        VISA_CPU_CONFIGURATION                VCpuFeatureSet;
+        BOOLEAN                     EnableSecondaryCpu;
+        UINTN                       NumberOfCpus;
+        UINTN                       MaximumCpusForThisSystem;
+
+        CPU_EXCHANGE_ROLE_INFO      BSPInfo;
+        CPU_EXCHANGE_ROLE_INFO      APInfo;
+
+        EFI_CPU_ARCH_PROTOCOL       *CpuArch;
+        EFI_EVENT                   CheckThisAPEvent;
+        EFI_EVENT                   CheckAllAPsEvent;
+        EFI_EVENT                   WaitEvent;
+        UINTN                       BSP;
+        UINT32                      *BistHobData;
+        UINTN                       BistHobSize;
+
+        UINTN                       FinishCount;
+        UINTN                       StartCount;
+        EFI_AP_PROCEDURE            Procedure;
+        VOID                        *ProcArguments;
+        BOOLEAN                     SingleThread;
+        UINTN                       StartedCpuNumber;
+
+        CPU_DATA_BLOCK              CpuData[MAXIMUM_CPU_NUMBER];    // CPU的信息记录
+        EFI_CPU_STATE_CHANGE_CAUSE  DisableCause[MAXIMUM_CPU_NUMBER];
+    } MP_SYSTEM_DATA;
+[5] WAKEUP_BUFFER
+    统一的AP的SIPI的中断跳转地址，AP执行码的内存，必须分配在1M一下，并且是4K对齐的。在INSYDE中
+    使用[2000H, 8F000H]之间的地址
+    typedef struct {
+        UINT8 *RendezvousFunnelAddress;     // 函数地址
+        UINTN PModeEntryOffset;     // 保护模式的跳转地址，需要RUNTIME定位
+        UINTN FlatJumpOffset;       // 保护模式后跳转到的执行地址，同上
+        UINTN Size;         // Code大小
+    } MP_ASSEMBLY_ADDRESS_MAP;
+[6] EXCHANGE_INFO
+    非保护模式下，MP的信息交换地址，紧跟在WAKEUP_BUFFER之后，和其一种占用4K大小空间
+    typedef struct {
+        UINTN             Lock;     // 临时锁，主要用于S3回来后，堆栈的临时分配
+        VOID              *StackStart;  // 所有MP的堆栈首地址
+        UINTN             StackSize;    // 每个AP的堆栈大小
+        VOID              *ApFunction;  // 执行的C函数
+        PSEUDO_DESCRIPTOR GdtrProfile;  // GDT寄存器信息
+        PSEUDO_DESCRIPTOR IdtrProfile;  // IDT寄存器信息
+        UINT32            BufferStart;  // WAKEUP_BUFFER首地址
+        UINT32            Cr3;
+        UINT32            InitFlag;     // 初始化标志: 1 非S3初始化； 0 非初始化； 2 S2初始化
+        BIST_INFO         BistBuffer[MAXIMUM_CPU_NUMBER];   // 每个AP的BIST信息和分配的CPU号
+    } MP_CPU_EXCHANGE_INFO;    
+== 驱动初始化工作 ==
+    * 设置GDTR,进入保护模式
+    * 初始化IDTR,设置好中断处理函数
+    * 注册INTEL处理器的32个异常处理函数
+    * 依照MTTR刷新GCD Memory
+    * 获得BSP的CPU_FEATURE，并初始化CPU
+    * 检查BSP前端总线速度
+    * 注册关于SMM协议的监听事件
+    * 初始化多处理 [IA32和X64不同]
+    * _IA32_ 分为S3路径和非S3路径
+        * _非S3路径_
+            * 分配数据结构
+            * 注册内存测试监听事件
+            * 添加ACPI_DATA到ACPI变量表
+            * 获得当前Image入口函数，添加到BOOT_SCRIPT表中
+        * _S3路径_
+            * 从HOB中获取ACPI_VARIABLE_SET变量
+            * 按照MP_SYSTEM_DATA中的CPU_FEATURE配置BSP
+            * 读取BSP的MTTR信息，用于AP配置
+            * 唤醒AP
+    * _X64_
+        * 分配RESERVED_DATA在ACPI_NVS_RAM中
+        * 初始化ACPI_CPU_DATA和MP_SYSTEM_DATA信息
+        * 注册内存测试协议的监听事件，回调实际的MP初始化函数
+        * 添加ACPI_VARIABLE_SET到ACPI变量表中
+    * _内存测试协议安装后_
+        * 读取MTTR，便于AP配置
+        * 初始化MP系统
+        * 注册监听CSM模块注册的事件，便于WAKEUP_BUFFER的重定位操作
+        * 注册BOOT_SERVICE_EXIT事件，便于重置AP
+        * 安装UEFI的MP协议
+== BSP、AP各自的初始化步骤 ==
+=== BSP 初始化流程 ===
+    * 设置APIC为Virtual Mode模式
+    * 按照系统预置的CPU策略获得当前系统中CPU的实际情况(核数、是否支持超线程等)
+    * _IA32_
+        * 在1M以下分配WAKEUP_BUFFER空间
+        * 分配AP需要的堆栈空间
+        * 进行相应的地址重定位，使得AP执行后可以正确跳转
+    * _X64_
+        * 在1M以下分配WAKEUP_BUFFER空间
+        * 在4G以下分配AP需要的堆栈空间
+        * 进行地址重定位
+    * 分配WAKEUP_BUFFER的拷贝，用于CSM阶段的重定位处理
+    * 初始化系统中的数据结构，并生成供AP使用的GDTR、IDTR表，并登记BSP的信息(使用VISA)
+    * 配置EXCHANGE_INFO数据结构，对于X64而言，主要多了一个CR3配置
+    * 关中断，统计当前AP个数
+    * 初始化AP [[AP初始化流程]]
+    * 创建ALL_AP和SINGLE_AP的轮训事件，主要用于后续的MP协议使用
+    * 登记所有CPU信息并初始化CACHE
+=== AP初始化流程 ===
+    * 初始化浮点运算器
+    * 获得锁(MP_SYSTEM_DATA->AP_Serialize_Lock)
+    * 初始化APIC为VIRTUAL MODE模式
+    * 同步BSP的MTTR
+    * 更新MICROCODE并按照CPU_FEATURE初始化CPU
+    * 判断是否支持超线程和L3 CACHE
+    * 登记AP信息(使用VISA)
+== S3过程的处理 ==
+== X64支持需要注意的问题 ==
+== UEFI的MP协议支持分析 ==
+== VISA模块的调用点 == 
+    * BSP设置相应的CPU_FEATURE时使用
+    * 在获得CPU信息时，使用VISA库
+== CSM模块的支持 ==

@@ -1,0 +1,15 @@
+= vim related problem =
+* remove the ^M symbol of file in Windows env
+    1. `set fileformats=unix,dos`
+    2. `%s/\r\+$//e`, remove ^M symbol
+* how to check Vim variable
+    1. for environment variable, `:echo $var`
+    2. for vim variable, `:echo &var` or `set var`
+* official vim can't create "open with gvim" item in popmenu in win64
+    modify the regedit to add "gvim" item:
+    HKEY_LOCAL_MACHINE\SOFTWARE\Classes\*\Shell\
+        1. right-click shell, create a new item "gvim", enter "gvim" in defautl key value
+        2. select the "gvim" item, create a subitem "Command", enter default value:
+            C:\Program Files (x86)\Vim\vim72\gvim.exe "%1", that's done.
+    ref link: http://blog.csdn.net/iamduoluo/article/details/7991321
+

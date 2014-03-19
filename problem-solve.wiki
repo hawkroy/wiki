@@ -1,0 +1,9 @@
+= git related problem =
+* if filemode is not correct, ex. from 0644 to 0755. Let git ignore this change, especially for windows env, command:
+    `git config [--global] core.fileMode false`
+  if global take effect, add "--global"
+* ignore the ^M (CR in windows)
+    `git config [--global] core.whitespace cr-at-eol`
+
+= gcc related problem =
+* if compile with higher version gcc, encounter "bit/predefs.h" can't find issue, install "gcc-multilib" and "g++-multilib" package

@@ -1,0 +1,6 @@
+= My ToDo List =
+    * [ ] Blade2 13' BIOS PO {eDP}
+    * [ ] Blade2 8'/10' Panel Enable  
+    * [ ] ULPMC????
+    * [ ] yu'e bao, zhifubao password
+    * [ ] seek my lost gloves

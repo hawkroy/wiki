@@ -1,0 +1,29 @@
+= My Knowledge Base =
+    * [[ToDo]] --- ToDo list for myself
+    == My Study ==
+        === System ===
+            * [[Compiler]] --- Compiler related Knowledge
+            ==== Operating System ====
+                * [[Linux Kernel]] --- Linux kernel knowledge
+            ==== Architecture ====
+                * [[x86]]   --- x86 processor technology
+                * [[qemu]]  --- qemu emulation tricks
+                * [[bochs]] --- bochs x86 emulator
+            ==== BIOS ====
+                * [[BIOS_EDK2]] --- BIOS edk2 code related
+                * [[AMI BIOS]] --- AMI BIOS
+                * [[INSYDE BIOS]] --- Insyde BIOS
+        === Ecconomic ===
+            * [[CPA]] --- CPA exam
+        === Languages ===
+            * [[Python]] --- Python Knowledge
+            ==== Vim ====
+                * [[Vimwiki]] --- vim wiki memo 
+                * [[Vimtip]]  --- vim tips & tricks
+        === Algorithms ===
+            * [[HDU]] --- HDU OJ report
+    == Misc ==
+        * [[problem-solve]] --- misc problems solution
+    == My Project ==
+        * [[Tiger]] --- Tiger Language Project
+        * [[Emulator]]  --- a Multi-Program Emulator

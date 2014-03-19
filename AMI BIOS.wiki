@@ -1,0 +1,259 @@
+ = AMI多处理器支持分析 =
+== 多处理器同步策略 ==
+=== 关键的数据结构 ===
+[1] AP_GLOBAL_DATA
+    AP信息的全局数据结构，用于保存AP共有的一些辅助数据
+    typedef struct {
+	    CPU_CONTROL	*CpuControl;    // 每个AP的控制结构
+	    VOID	*HaltLoopEntry;     // CPU 忙等指令
+	    VOID	*ReleaseCpu;        // 多CPU同步信号
+	    UINT8	CpuSync;            // 多CPU同步信号
+	    UINT8	Bsp;                // BSP 编号
+    	UINT8	NumCpus;            // CPU数目
+        UINT8	RunningAps;         // 多CPU同步信号: 在运行CPU
+        UINT8	HaltedCpus;         // 多CPU同步信号: 已停止CPU
+    } AP_GLOBAL_DATA;
+[2] CPU_CONTROL
+    用于保存每个AP的流程控制结构，主要包括可执行代码地址，和堆栈地址等
+    typedef struct {
+	    VOID	(*Function)(UINT8 Cpu, VOID *Context);  // 可执行函数
+	    VOID	*Context;			// 函数参数
+	    VOID	*Stack;             // 堆栈地址
+	    UINT32	Id;                 // CPU 编号
+	    UINT8	Halted;				// 是否需要停机标志
+    } CPU_CONTROL;
+[3] ZERO_DATA
+    在物理地址0上创建的数据结构，用于多处理器之间的同步过程
+    typedef struct {
+	    UINT64	Gdt;        // GDT表描述
+        UINT64  JmpAddress; // 实际的执行地址
+	    UINT32	NumAps;     // 同步机制
+        UINT32  NumApsBelow1MB;     // 同步机制
+	    UINT32	ApGlobalData;       // 全局数据结构
+        @ifndef PEI_COMPILE
+        UINT32  PageTable;          // 页表
+        @endif
+    } ZERO_DATA;   
+[4] 没有实际的结构，是实际的中断代码执行地址0x1000，4K边界上，需要修正相应的跳转地址
+== 驱动初始化工作 ==
+    * _PEI_
+        * 创建HOB
+        * 判断是否是S3路径，以便进行相应的恢复
+    * _DXE_
+        * 获得HOB信息
+        * 初始化系统中断
+        * 设置界面上的CPU配置信息
+        * 初始化MP系统
+        * 创建用于S3的变量
+        * 注册BOOT_SERVICE_EXIT和LEGACY_BIOS相关的监听函数
+        * 安装MP多协议的函数
+== BSP、AP各自的初始化步骤 ==
+=== BSP 初始化流程 ===
+    * _PEI_
+        * 将LAPIC设置为VIRTUAL MODE模式
+        * 分配全局AP_GLOBAL_DATA数据结构
+        * 在1M以下分配中断代码执行空间
+        * 进行地址重定位，以便AP正常跳转
+        * 在物理地址0H创建AP临时交互数据区
+        * 统计CPU个数
+        * 获得所有AP的LAPIC ID和相应临时CPU编号
+        * 重排CPU编号，使得BSP为0
+        * 分配AP的CPU_CONTROL控制结构，这里主要是Stack的分配
+        * 初始化AP
+    * _DXE_
+        * 将LAPIC设置为VIRTUAL MODE模式
+        * 分配全局AP_GLOBAL_DATA数据结构
+        * 在1M以下分配中断代码执行空间
+        * 进行地址重定位，以便AP正常跳转
+        * 在物理地址0H创建AP临时交互数据区
+        * 统计CPU个数
+        * 获得所有AP的LAPIC ID和相应临时CPU编号
+        * 重排CPU编号，使得BSP为0
+        * 分配AP的CPU_CONTROL控制结构，这里主要是Stack的分配
+        * 初始化AP
+=== AP 初始化流程 ===
+    * _PEI_
+        * 初始化LAPIC为VIRTUAL MODE模式
+        * 初始化浮点运算单元
+        * 更新MICROCODE
+        * 根据CPU_FEATURE初始化CPU
+    * _DXE_
+        * 初始化LAPIC为VIRTUAL MODE模式
+        * 初始化浮点运算单元
+        * 获得当前CPU的CACHE配置信息
+        * 将当前CPU的信息登记到CPU信息表中
+== S3过程处理 ==
+== X64支持需要注意的问题 ==
+== UEFI的MP协议支持分析 ==
+== VISA模块的调用点 ==
+== CSM模块的支持 ==
+
+ = AMI中基于409板子的CPU模块分析 =
+
+== 1 FV_BB和FV_Main中的文件加载顺序问题 ==
+    FV_BB: 系统启动后，首先执行的FV文件，对应Insyde和EDK中的FVRecovery    
+    FV_Main: 主要包括的是Dxe阶段的执行代码，由FV_BB最后阶段的DxeIpl的PEIM负责加载
+
+=== 1.1 FV_BB中的CPU模块文件加载顺序 ===
+    * Build\VisaCpuPei.ffs
+        VISA库中的CPU的PEIM模块，主要用于注册供系统使用的CPU PPI。
+    * Build\VisaDramPei.ffs    
+        VISA库中的DRAM PEIM模块
+    * Build\VisaNbPei.ffs      
+        VISA库中的NB PEIM模块
+    * Build\VisaSbPei.ffs      
+        VISA库中的SB PEIM模块
+    * Build\CRBPEI.ffs         
+        CRB(Chip Reference Board)模块的PEIM
+    * Build\CORE_PEI.ffs
+        核心PEI文件，相当于Insyde和EDK中的PeiMain所在的模块
+    * Build\Recovery.ffs       
+        用于做S3回复的模块
+    * Build\Startup.ffs
+        暂时不清楚，应该和Cpu有关系
+    * Build\CpuPeiBeforeMem.ffs
+        CAR阶段的Cpu初始化PEIM
+    * Build\CPUPEI.ffs
+        CPU模块的PEIM
+    * Build\NBPEI.ffs
+        NB模块的PEIM
+    * Build\MemDetect.ffs      
+        用于进行内存初始化，并通知其他模块内存初始化完成的模块
+    * Build\SBPEI.ffs          
+        SB模块的PEIM
+    * Build\Capsule.ffs        
+        解压缩用的模块
+    * Build\SmbiosFlashData.ffs  
+        不清楚
+
+=== 1.2 FV_Main中的CPU模块文件加载顺序 ===
+    * Build\Microcode.ffs
+        用于加载CPU模块微代码的模块
+    * Build\VisaCpuDxe.ffs
+        DXE阶段的VISA库中的CPU模块
+    * Build\VisaNbDxe.ffs           
+        NB模块的DXE阶段模块
+    * Build\VisaSbDxe.ffs  
+        SB模块的DXE阶段模块
+    * Build\CORE_DXE.ffs
+        DXE阶段的核心模块，类似于包含DxeMain的文件
+    * Build\Runtime.ffs             
+    * Build\CpuDxe.ffs
+        DXE阶段的CPU模块，用于DXE阶段的CPU配置
+    * Build\x86thunk.ffs
+        x86的桩代码，用途还不太清楚，应该跟CPU有关
+
+== 2 AMI中CPU涉及到的文件目录 ==
+    * VISA目录中有关CPU部分的Code
+        * Foundation目录下的CPU的PPI和PROTOCOL部分
+        * Porting目录下的Library目录部分
+    * Board目录下的CPU部分
+    * Core目录下的CPU部分
+
+== 3 PEI阶段的CPU执行过程 ==
+    不考虑SEC阶段的CPU初始化过程，只从PEI阶段说起~~~对于PEI阶段而言，所有的初始化工作都是通过PeiMain
+    的Dispatcher函数来完成的。通过按照上面的FV_BB中的加载顺序，顺序的执行每一个PEIM完成CPU的初始化
+    * VisaCPUPei.ffs
+        注册一个VisaCpuPPI的协议后，返回。位置: Visa\Foundation\Cpu目录
+    * CORE_PEI.ffs
+        用于PEIM的分派工作，和CPU的执行过程没有多大关系。
+    * Startup.ffs
+        这里写的有些不对。按照看到的代码，这个FFS应该是最先执行的Code，在主机Reset后，通过0xfffffff0
+        这个地址执行的第一段代码。但是从加载顺序看又不是这样。权且认为它是第一个执行的code，即SEC阶段
+        目前没怎么看懂，过段时间再说。涉及到的文件: Startup32.asm、SECCore.asm、CpuEarlyInit.asm、
+        SECNB_EarlyInit.asm、SECSB_EarlyInit.asm、SECCRB_EarlyInit.asm
+    * CpuPeiBeforeMem.ffs
+        这个PEIM没做什么，仅仅是注册了一个AMI_PEI_CPUINIT_POLICY_PPI_GUID的PPI，是数据PPI，值为TRUE
+        这个PEIM涉及到文件: CpuPeiBeforeMem.c CpuSupport32.asm
+    * CPUPEI.ffs
+        霍霍~~~~到了最难的这个CPU初始化过程了。这个工程我会在下面重点讲，其中涉及到MP的问题。
+
+=== 3.1 CPU PEI流程 ===
+    这个模块是CPU在PEI阶段最主要的初始化步骤。其中涉及到了多处理器机制，所以首先需要我们有一些关于MP
+    和LOCAL APIC的知识，可以参考<<MP系统.wiki>>这篇文章。这里的初始化流程，我们将分为BSP和AP两部分同
+    时进行介绍
+                BSP部分                                                     AP部分
+      1. 获得BOOT_MODE、VISA_PPI等有关
+         配置信息
+      2. 统计大于1M而小于4G的内存大小，
+         并初始化MTTR (这里有个问题: 如果
+         内存不连续，出现空洞怎么办？)
+      3. 判断当前CPU是否支持超线程，并创建
+         相应HOB
+      4. 初始化PEIAPDATA数据结构，用于后续的AP
+         初始化过程
+      5. 配置BSP的LOCAL APIC为VIRTUAL WIRE MODE
+      6. 启动所有的AP
+        6.1 分配AP_GLOBAL_DATA数据结构，用于管理
+        6.2 统计当前的AP数量
+           6.2.1 备份AP初始化代码段出的数据(地址为4K)
+           6.2.2 在物理地址0处分配一个全局数据结构
+                 ZERO_DATA，用于所有CPU的同步和信息
+                 记录
+           6.2.3 拷贝AP的启动代码到4K位置，并修正跳转
+                 地址
+           6.2.4 发送INIT中断给所有AP，等待10毫秒
+           6.2.5 发送START中断给所有AP，等待200微秒 -------------> 1. 接收到START中断后，CPU处于
+                                                                      实模式
+                                                                   2. 增加全局数据中的CPU个数
+                                                                   3. 增加运行于1M以下的CPU个数
+                                                                   4. 跳转到保护模式，加载GDT表
+                                                                   5. 执行长跳转到1M以上代码处
+                                                                   6. 加载数据段寄存器
+                                                                   7. 使能LOCAL APIC，并配置为
+                                                                      VIRTUAL WIRE MODE
+                                                                   8. 获得AP_GLOBAL_DATA数据结构
+      +----------------------------------------------------------- 9. 递减运行于1M以下代码的CPU个数
+      |                                                            10. 获得实际的初始化代码，并跳转
+      |                                                            HOLD_CPU:
+      |                                                            11. 轮询ReleaseCpu变量是否为0
+      |                                                     +----> 12. 非0时为CPU_INFO_INIT变量地址
+      |                                                     |          否则跳转到HOLD_CPU
+      |                                                     |      13. 设置当前CPU_INFO_INIT变量中的
+      |                                                     |          CPU ID
+      |                                                     |      14. 递减CpuSync变量
+      |                                                     |      HOLD_CPU2:
+      |                                                     |  +-> 15. 轮询当前的CpuNum计数
+      |                                                     |  |   16. 如果为0FFFFFFFFH，则跳转到
+      |                                                     |  |       HOLD_CPU2
+      |                                                     |  |   17. 递减CpuSync变量，告知BSP
+      |                                                     |  |   18. 获得本AP的CPU_CONTROL结构，并
+      |                                                     |  |       初始化ESI、SP等寄存器
+      |    6.2.6 再次发送START中断给所有AP，等待1024微秒    |  |   19. 进行全局的初始化(如浮点处理器)
+      |    6.2.7 统计AP个数                                 |  |
+      +--> 6.2.8 等待所有AP运行1M以上的代码                 |  |
+           6.2.9 恢复启动AP之前的4K地址数据                 |  |
+        6.3 分配CPU_INFO_INIT数据结构，记录AP初             |  |
+            始化信息                                        |  |    ;; 下面的部分是主循环，用于执行
+        6.4 设置CpuNum为0xffffffff，分配CPU_CONTROL数据结构 |  |       不同的代码
+            用于执行时CPU环境的控制，初始化CpuSync变量      |  |    HOLD_CPU3:
+        6.5 为每个AP分配一个4K的Stack                       |  |    20. 判断是否Halt
+        6.6 设置ReleaseCpu为每个AP的CPU_INFO_INIT结构地址 --+  |    21. 如果HALT,则跳转到HALT_CPU
+            等待ReleaseCpu清0                                  |    22. 判断是否不为0
+                                                               |        为0则跳转到HOLD_CPU3
+        6.7 等待CpuSync变量清0                                 |    23. 配置相应环境，执行具体代码
+        6.8 统计每个CPU的ID                                    |    24. 执行完毕，判断BSP是否改变
+           6.8.1 按照CPU的ID大小，重新排序CPU_CONTROL的顺序，  |    25. BSP没有改变，清空Function
+                 并按照此顺序依次分配一个4K的Stack             |    26. 递减RunningAps
+           6.8.2 设置CpuNum为相应的顺序值 ---------------------+    27. 跳转到HOLD_CPUS
+      7. 在所有的AP上执行预初始化程序(ApPreInit)                    HALT_CPU
+        7.1 装载CPU微代码                                           28. 如果有内存代码，执行内存代码
+        7.2 初始化MTTR                                                  否则， 关中断忙等待
+      8. 获得当前的AP数量，同时决定所有CPU的Feature
+        8.1 调用CPUID获得当前CPU的FEATURE
+      9. 创建关于CPU的HOB                                           
+      10. 在所有的CPU(包括BSP)上执行CPU初始化过程(InitializeCPU)
+        10.1 调用VISA的CPU_PPI，获得每个CPU的CPU信息，并存储于
+             CPU_INFO结构中
+      11. 初始化SMM模式
+      12. 使所有的AP进入Halt状态(忙等待)
+      13. 发送PEI阶段结束PPI通知信号
+
+=== 3.2 Startup (SECCORE) 流程 ===
+
+== 4 DXE阶段的CPU执行过程 ==
+    待续
+
+== 5 参考 ==
+    # Intel Software Develop Manual Part-3
+    # MultiProcessor Specification Version-1.4

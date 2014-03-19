@@ -1,0 +1,258 @@
+ = MP Premilitery Knowledge =
+== 1 MP Basic Structure ==
+    MP is Multi Processor abbrv，Figure-1 is a typical Multi Processor Architecture.
+          +------------+       +-------------+             +--------------+
+          |    BSP     |       |    AP-0     |             |    AP-1      |
+          +------------+       +-------------+     - - -   +--------------+
+          | Local APIC |       |  LOCAL APIC |             |  LOCAL APIC  |
+          +-+------+---+       +---+---+-----+             +---+--------+-+
+           /|\    /|\             /|\  |                      /|\      /|\
+            |      |               |   |                       |        |
+            |      |               |   |                       |        |
+            |      |               |   |                       |        |
+  /        \|/     |         High \|/  |Bandwidth Memory Bus  \|/       |              \
+  ----------+------+---------------+---+-----------------------+--------+---+-----------
+  \                |                   |                                |  /|\         /
+                   |                   |                                |   |
+  /               \|/   ICC (Interrup \|/ Controller Communication) Bus\|/  |          \
+  -----------------+--+----------------+-------+------------------------+---+-----------
+  \                  /|\                      /|\                           |          /
+                      |                        |                            |
+                      |                        |                            |
+                     \|/                      \|/                          \|/
+               +------+-----+            +-----+------+         +-----------+----+
+               |            |            |            |         |                |
+               |  IO APIC   |            |  IO APIC   |         | Shared Memory  |
+               |            |            |            |         |                |
+               +------------+            +------------+         +----------------+
+                                     
+                                     Figure-1 Typical MP Architecture
+    
+    BSP: Bootstrap Processor，startup CPU
+    AP: Application Processor，same as BSP except for bootup and shutdown
+    This Architecture is symmetrical system, means sharing memory, using same address space. 
+    Interrupt controlled by LOCAL APIC/ I/O APIC.
+== 2 Common Registers ==
+    Table-1 LOCAL APIC Common Registers
+    +-----------+------------------------+------------+
+    |  Address  |    Register Name       | Read/Write |
+    +-----------+------------------------+------------+
+    |FEE0 0020H |LOCAL APIC ID Reg       |  R/W       |
+    +-----------+------------------------+------------+
+    |FEE0 0030H |LOCAL APIC VERSION Reg  |  RO        |
+    +-----------+------------------------+------------+
+    |FEE0 00F0H |Spurious Interrupt      |  0-8 R/W   |
+    |           |Vector Reg              |  9-31 RO   |
+    +-----------+------------------------+------------+
+    |FEE0 0300H |Interrupt Command Reg[L]|  R/W       |
+    +-----------+------------------------+------------+
+    |FEE0 0310H |Interrupt Command Reg[H]|  R/W       |
+    +-----------+------------------------+------------+
+    |FEE0 0320H |LVT Timer Reg           |  R/W       |
+    +-----------+------------------------+------------+
+    |FEE0 0330H |LVT Thermal Sensor Reg  |  R/W       |
+    +-----------+------------------------+------------+
+    |FEE0 0340H |LVT Performance Monitor |  R/W       |
+    +-----------+------------------------+------------+
+    |FEE0 0350H |LVT LINT0 Reg           |  R/W       |
+    +-----------+------------------------+------------+
+    |FEE0 0360H |LVT LINT1 Reg           |  R/W       |
+    +-----------+------------------------+------------+
+    * LOCAL APIC ID Register
+        This register represents current CPU LAPIC ID, mainly used for inter-processor interrupt, easily for BIOS & OS to clarify and use
+     +---------+------------------------------------------+
+     |  Bits   |          Description                     |
+     +---------+------------------------------------------+
+     | 31-24   |  APIC id                                 |
+     +---------+------------------------------------------+
+     | others  |  Reserved                                |
+     +---------+------------------------------------------+
+    * LOCAL APIC VERSION Register
+        represents LAPIC version, also indicating LAPIC includes how many LVTs
+     +---------+--------------------------------------------+
+     |  Bits   |           Description                      |
+     +---------+--------------------------------------------+
+     | Version |  1xH      Local APIC, 14H for P4 and Xeon  |
+     | (7-0)   |  0xH      82489DX external APIC            |
+     |         |  20H-FFH  Reserved                         |
+     +---------+--------------------------------------------+  
+     | 15-8    |  Reserved                                  |
+     +---------+--------------------------------------------+
+     | MAX LVTs|  the number of LVT entries minus 1         |
+     | 23-16   |                                            |
+     +---------+--------------------------------------------+
+     | 31-24   |  Reserved                                  |
+     +---------+--------------------------------------------+
+    * Interrupt Command Register{L}
+        very important register, control inter-processor interrupt type
+     +---------+--------------------------------------------+
+     |  Bits   |           Description                      |
+     +---------+--------------------------------------------+
+     | Vector  |    7-0, for 255 vectors (except 15-0)      |
+     +---------+--------------------------------------------+
+     |         | 000: Fixed                                 |
+     |Delivery | 001: Lowest Priority                       |
+     | Mode    | 010: SMI                                   |
+     |         | 011: Reserved                              |
+     | 10-8    | 100: NMI                                   |
+     |         | 101: INIT                                  |
+     |         | 110: Start up                              |
+     |         | 111: Reserved                              |
+     +---------+--------------------------------------------+
+     | Dest    | 11, 0: physical                            |
+     | Mode    |     1: logical                             |
+     +---------+--------------------------------------------+
+     |Delivery | 12, 0: Idle                                |
+     | Status  |     1: Send Pending                        |
+     +---------+--------------------------------------------+
+     | Level   | 14, 0: De-assert                           |
+     |         |     1: assert                              |
+     +---------+--------------------------------------------+
+     | Trigger | 15: 0: Edge                                |
+     | Mode    |     1: Level                               |
+     +---------+--------------------------------------------+
+     | Dest    | 19-18, 00: no shorthand                    |
+     |ShortHand|        01: self                            |
+     |         |        10: all including self              |
+     |         |        11: all excluding self              |
+     +---------+--------------------------------------------+
+     | others  | Reserved                                   |
+     +------------------------------------------------------+
+    * Interrupt Command Register{H}
+        mainly define the target interrupt processor
+     +---------+--------------------------------------------+
+     | Bits    |       Descrioption                         |
+     +---------+--------------------------------------------+
+     | Dest    |  only used when dest shothand set to 00    |
+     |         |  in physical mode, 56-63 for APIC ID of    |
+     | 63-56   |  p4 and Xeon, 56-59 for Pentium and p6     |
+     |         |  in logical mode, depends on DFR and LDR   |
+     +---------+--------------------------------------------+
+     | others  |  Reserved                                  |
+     +---------+--------------------------------------------+
+    * LVT Registers
+        Interrupt vector register, the number is defined by LAPIC version register, defined different interrupt trigger type
+    31                 18 17  16 15     13 12 11   8 7         0
+     +---------------------------------------------------------+
+     |    Reserved       |   |   |   R   |    |  R  |  Vector  |
+     +---------------------+---+-----------+-------------------+
+                           |  /|\         /|\
+                           |   |           |
+   Timer Mode  /           |   |           |
+ 0: one-shot   ------------+   |           |
+ 1: periodic   \               |           |          \
+                               |   +------------------- Remote IRR
+                               |   |       |          /
+                  Mask         |   |       |                                          
+                 0: not masked |   |     +-+                                           
+                 1: masked     |   |     |  Delivery Status
+                               |   |     |   0: idle                                      
+                               |   |     |   1: send pending
+                               |   |     |
+                               |   |     |         \
+                               |   | +-------------- Interrupt Input Pin Polarity
+                               |   | |   |         /
+                               |   | |   |
+                             +-+   | |   |
+                             |     | |   |
+   Trigger Mode   /          |     | |   |                 \   Delivery mode
+   0: Edge        -----------|--+  | |   |       +----------        000: Fixed
+   1: Level       \          |  |  | |   |       |         /        010: SMI
+                             |  |  | |   |       |                  100: NMI
+                             |  |  | |   |       |                  111: ExtINT
+                             |  |  | |   |       |                  101: INIT
+    31                  17  \|/ |  | |  \|/ 11 10| 8 7         0    others: Reserved
+     +-----------------------+--+--+-+---+-------+-------------+
+     |     Reserved       |   |  |  |  |   | R |    |  Vector  |
+     +---------------------------------------------------------+                                    
+     |     Reserved       |   |  |  |  |   | R |    |  Vector  |
+     +---------------------------------------------------------+
+     |     Reserved       |   |   R    |   |   R    |  Vector  |
+     +---------------------------------------------------------+
+     |     Reserved       |   |   R    |   | R |    |  Vector  |
+     +---------------------------------------------------------+
+     |     Reserved       |   |   R    |   | R |    |  Vector  |
+     +---------------------------------------------------------+
+                           16  15 14 13 12
+     *R for Reversed
+== 3 MP Initialize Process ==
+    Some commonly used registers:
+    ICR_LOW         EQU     0FEE0 0300H
+    SVR             EQU     0FEE0 00F0H
+    APIC_ID         EQU     0FFE0 0020H
+    LVT3            EQU     0FEE0 0370H
+    APIC_ENABLED    EQU     0100H
+    BOOT_ID         EQU     ?
+    COUNT           EQU     00H
+    VACANT          EQU     00H
+=== 3.1 BSP Initialize Flow ===
+    # Initializes memory
+    # Load microcode update into processor
+    # Initialize MTTRs
+    # Enable Cache
+    # Execute CPUID instruction to determine if the BSP is "GenuineIntel".
+        MOV EAX, 1H
+        CPUID
+        JUDGE THE EBX, ECX, EDX Register
+    # Execute CPUID instruction to store the information in a RAM
+    # Load Start-up code for APs to execute into *a 4-KB page in the lower 1M of memory*
+    # Switch to protected mode and insure the APIC address space is mapped to the strong uncachable memory type (UC)
+    # Determine the BSP's APIC id from local APIC ID register, save the APIC id in ACPI and MP table and optionally in RAM
+        MOV ESI, APIC_ID
+        MOV EAX, [ESI]
+        AND EAX, 0FF00 0000H
+        MOV BOOT_ID, EAX
+    # Converts the base address of the 4-KB page for the APs' bootup code into 8-bit vector. The 8-bit vector defines *the address of a 4-KB page in the real-address mode address space(1M space)*
+    # Enable local APIC by setting bit 8 of the APIC spurious vector
+        MOV ESI, SVR
+        MOV EAX, [ESI]
+        OR EAX, APIC_ENABLED
+        MOV [ESI], EAX
+    # Sets up the LVT error handling entry by establishing an 8-bit vector for the APIC err handler
+        MOV ESI, LVT3
+        MOV EAX, [ESI]
+        AND EAX, FFFF FFF00H        ;clear out previous vector
+        OR EAX, 0000 00xxH          ;xx is the 8-bit vector the APIC error handler
+        MOV [ESI], EAX
+    # Initialize the Lock Semaphore variable VACANT to 00h, the AP use this to determine the order in which they execute BIOS AP initialization code
+    # Performs following operation to set up the BSP to detect the presence of APs in the system and the number of processors:
+        * set the value of COUNT to 1
+        * start a timer (about 100ms). In the AP initialize code, the AP will increment COUNT to indicat its presence. when timer expires, BSP check value of COUNT.
+    # Broadcast an INIT-SIPI-SIPI IPI sequence to APs to wake them up and initialize them:
+        MOV ESI, ICW_LOW
+        MOV EAX, 000C 4500H     ;load ICR encoding for broadcast INIT IPI
+        ;to all APs into EAX
+        MOV [ESI], EAX          ;to all APs
+        ;10000ms dely loop
+        MOV EAX, 000C 46XXH     ;load ICR encoding for broadcast SIPI IPI
+        ;to all APs into EAX, where xx is the vector compute in step 10
+        MOV [ESI], EAX          ;broadcast SIPI IPI to all APs
+        ;200ms delay loop
+        MOV [ESI], EAX          ;broadcast second SIPI IPI to all APs
+        ;200ms delay loop
+    # Wait for timer interrupt
+    # Read and evaluate COUNT and establishes processor count
+    # If necessary, reconfigures the APIC and continue with remaining system diagnostics
+=== 3.2 AP Initialize Flow ===
+    当AP收到SIPI的信号，开始执行SIPI指定的BIOS的AP初始化代码。
+    # Wait on BIOS initialization Lock Semaphore. When control of the semaphore is attained, initialize continues
+    # Load the microcode update into processor
+    # Initialize the MTTRs (using same mapping that was used for BSP)
+    # Enable cache
+    # Execute CPUID to determine if the AP is "GenuineIntel".
+        MOV EAX, 0H
+        CPUID
+        JUDGE EBX, ECX, EDX
+    # Execute CPUID to save configuration into RAM
+        MOV EAX, 1H
+        CPUID
+        SAVE EBX, ECX, EDX into RAM
+    # Switch to protected mode and insure APIC address space is mapped to UC memory space
+    # Determine AP's APIC ID from the local APIC ID register, add to ACPI and MP table and optionally to RAM
+    # Initialize and configure local APIC by setting bit 8 in the SVR register and setting up LVT3 for err handling
+    # Configure AP's SMI execution ennvironment (Each AP and BSP must have different SMBASE address)
+    # Increments the COUNT by 1
+    # Release semaphore
+    # Execute CLI and HLT instruction
+    # Wait for INIT IPI
+== 4 Interrupt Handle Flow ==

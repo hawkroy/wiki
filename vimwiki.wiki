@@ -1,0 +1,74 @@
+= Install =
+* get vimwiki-N-N.vba.gz from official website
+* unzip the vimwiki source, open the .vba, and execute ":so %" to install it
+
+= Syntax Element Self Description=
+= 1st Topic=
+== 2nd Topic ==
+=== 3rd Topic ===
+and so on
+
+when whitespace before topic, will middle-align
+  = middle topic =
+
+*Bold* _Italic_ ~~Delete-Line~~ `code`
+
+^up^lable, ,,bottom,,lable
+
+{{{ class="brush:php"
+    some code in format
+}}}
+
+[[wiki Item link|Description]]
+
+http://ktmud.com/
+[http://ktmu.com/ Ktmud]
+
+[[images/hello.jpg]]
+
+* Unorder list item1
+* Unorder list item2
+    - sub list item1
+    - sub list item2
+
+# order list item1
+# order list item2
+
+Table definition
+| HEAD1          | HEAD2    |
+| Vim            | Editor   |
+| GCC            | Compiler |
+
+%toc automatically generate contents
+%title generated HTML title, suggest located in the end of file
+%nohtml 
+tell vimwiki no generate HTML for this wiki file
+
+= Generated HTML =
+use ":Vimwiki2HTML generate current wiki HTML file; ":VimwikiAll2HTML" generate all HTML.
+if set the option "auto_export", then will generate HTML when saving wiki
+
+= Key Mapping =
+* <leader>ww    open wiki home page in current window
+* <leader>wt    open wiki home page in new tab
+* <leader>w<leader>w    open/create diary
+* <leader>ws    select the wiki
+
+= Multi wiki project =
+configure g:vimwiki_list to specify multiple wiki project.
+example:
+{{{ class="brush:wiki"
+let g:vimwiki_list = [{'path': 'path_to_wiki', \
+                       'path_html': 'path_to_html', \
+                       'html_header': 'header file', \
+                       'html_footer': 'footer file', \
+                       'diary_link_count': number},
+                      {another wiki project}]
+}}}
+
+= Configure vimwiki =
+* g:vimwiki_camel_case, set to 0, not let camel english to wiki index
+* g_vimwiki_hl_cb_checked, for checklist item when done will marked highlight
+* g:vimwiki_menu, set wiki menu
+* g:vimwiki_folding
+* g_vimwiki_CJK_length, when calc string lenght, considering the CJK case
