@@ -1,0 +1,30 @@
+= Install from source =
+`git clone git://git.qemu-project.org/qemu.git`
+`configure --prefix=$bin_dir --target-list=i386-softmmu,x86_64-softmmu,i386-linux-user,\`
+                   `x86_64-linux-user,arm-softmmu,arm-linux-user --enable-debug-tcg`
+for arm-softmmu, need dtc module, `git submodule init dtc`
+
+= Howto Use =
+== Support Image Type (file represents hard-disk) ==
+* raw   -   *default*, only occupied by real data in filesystem supporting *_sparse files_*
+* cloop -   compressed loop format, used by Knoppix and live CD Image
+* cow   -   copy-on-write format, obselete, no support on qemu on Win
+* qcow  -   old qemu copy-on-write, superseded by qcow2
+* qcow2 -   multiply snapshot, smaller image on filesystem don't support sparse files, optional AES,  optional zlib compression
+* vmdk  -   vmware 3, 4 or 6 image format
+* vdi   -   virtualbox 1.1 compatible image format
+
+== Image Using ==
+* Create Image
+    `qemu-img create -f <image-type> <file> <size>`
+* Using multiple images
+    qemu support upper to 4 image files 
+* Mounting image on host
+    - for raw type, `mount -o loop,offset=32256 <image-path> <mount-point>`
+        *note*: for image file without partitions, omit "offset=32256" option
+    - for other types, using qemu-nbd
+        `modprobe nbd max_part=16`
+        `qemu-nbd -c /dev/nbd0 <image-file>`
+        `partprobe /dev/nbd0`
+        `mount /dev/nbd0p1 <mount-point>`
+

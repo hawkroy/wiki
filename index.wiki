@@ -4,11 +4,13 @@
         === System ===
             * [[Compiler]] --- Compiler related Knowledge
             ==== Operating System ====
-                * [[Linux Kernel]] --- Linux kernel knowledge
+                * [[Linux Kernel]] --- Linux kernel Knowledge
             ==== Architecture ====
                 * [[x86]]   --- x86 processor technology
+                * [[openrisc]]  --- openrisc ISA
                 * [[qemu]]  --- qemu emulation tricks
-                * [[bochs]] --- bochs x86 emulator
+                * [[bochs]] --- bochs x86 Emulator
+                * [[systemc]]  --- systemc discussion
             ==== BIOS ====
                 * [[BIOS_EDK2]] --- BIOS edk2 code related
                 * [[AMI BIOS]] --- AMI BIOS
@@ -22,8 +24,10 @@
                 * [[Vimtip]]  --- vim tips & tricks
         === Algorithms ===
             * [[HDU]] --- HDU OJ report
+        === Network ===
+            * [[Omnetpp]]   --- Omnetpp simulator
     == Misc ==
         * [[problem-solve]] --- misc problems solution
     == My Project ==
         * [[Tiger]] --- Tiger Language Project
-        * [[Emulator]]  --- a Multi-Program Emulator
+        * [[Emulator]]  --- a Multi-Program Emulator 

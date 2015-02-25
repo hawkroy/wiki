@@ -1,0 +1,162 @@
+= Makefile =
+== important variable ==
+* KBUILD_SRC: specify build source directory
+* KBUILD_OUTPUT: build output directory
+* CURDIR: makefile internal variable, for current directory
+* srctree, objtree： source dir & build dir
+* build: set for to be compiled directory or file, will specify the makefile to makefile.build 
+* MAKECMDGOALS: makefile internal variable, make's ultimate target, we can use this variable to filter some target and do some action 
+* `make -p` will show all built-in-variable and built-in-rule
+== VPATH & vpath ==
+* VPATH: internal variable, VPATH will specify the lookup target and dependencies path for Makefile, not for compiler header files.
+* vpath: `vpath {pattern} {dir}`, more convenient tha VPATH, because can use regular-expression in pattern
+== function call ==
+    in makefile, we can use *$()* or *${}* to call intenal function 
+* function lists
+| subst      | ${subst old_pattern, new_pattern, str}                                                           |
+| patsubst   | pattern replace, % is general matcher, ex, ${patsubst %.c, %.o, string}, replace string .c to .o |
+| strip      | remove spaces in string                                                                          |
+| findstring | ${findstring pattern, string}                                                                    |
+| filter     | use multi pattern to filter string, ${filter %.c %.s, string}                                    |
+| filter-out | opposite of filter                                                                               |
+| sort       | will remove same string in string list ${sort str1 str2 str3 ...}                                |
+| word       | return n-th word in word list                                                                    |
+| wordlist   | return a list that selected words, ${wordlist 2,3 string-list}                                   |
+| firstword  |                                                                                                  |
+| wildcard   |                                                                                                  |
+| foreach    | a C-like foreach function, return a list ${foreach n, list, $(n)some}                            |
+| if         | ${if condition, true-clause, false-clause(option)}                                               |
+== kernel build flow==
+1. read parameter from commandline, if we change the build-dir, need re-invoke the makefile
+
+= bash shell =
+* `:` is null command, means no action, but can with parameter. common use: `:${var:=value}` means var will be updated by value, but no other action. if `:` miss, this will treat as a command call with var
+
+= How to make harddisk root image for Linux-0.11 =
+1. use `dd` tool to generate a hard-disk file for emulation
+    `dd if=/de/zero of=<filename> bs=<basic_size> count=size`
+2. mount the file to loop device with following command 
+    `sudo losetup /dev/loop0 <filename>`
+3. use fdisk to make partition on loop device
+    * make a primary partition, remember the start LBA of the partition, on modern PC, the offset should be 2048 sectors(512B/sector)
+    * and change the fs_type to your need(ex. minix 83)
+    `fdisk /dev/loop0`
+    * remove loop device mount
+    `sudo losetup -d /dev/loop0`
+4. now, we should mount the emulation block device's new partition. 
+NOTE!!: THE PARTITION START_LBA IS THE NUMBER FDISK PROVIDE TO YOU, BEFORE YOUR PARTITION, IT'S MBR AND UNUSED SPACE
+for history, please refer to http://blog.csdn.net/yxc135/article/details/8821763
+    `sudo losetup -o 1048576(2048*512) /dev/loop0 <filename>`
+5. use mkfs.<fs_format>(now, minix) to format partition
+    `sudo mkfs.minix /dev/loop0`
+    `sudo losetup -d /dev/loop0`
+6. OK, now we need copy some workeable root image to this new root image
+    `sudo mount -t <fs_type> -o loop,offset=1048576 <filename> <mount-point>`
+    `sudo mount -t <fs_type> -o loop <workable fd_filename> <workable mount-point>`
+    copy all file from workable root to new root
+7. umount all emulation files
+
+= Char Drv =
+* Chr Drv Type
+    - /dev/ttySn
+    - /dev/ptyp, /dev/ttyp, pseudo terminal
+    - /dev/tty 
+    - /dev/ttyn, /dev/console
+== tty struct ==
+{{{ class="brush:c"
+    struct tty_struct {
+        struct termios      termios;                        // terminal io attr, and control character data struct
+        int                 pgrp;                           // belongs pid
+        int                 stopped;                        // stop flag
+        void (*write)(struct tty_struct *tty);              // tty write function
+        struct tty_queue    read_q;                         // tty read queue  
+        struct tty_queue    write_q;                        // tty write queue
+        struct tty_queue    secondary;                      // tty auxilury queue [standard mode character seq]
+    };
+}}}
+
+= Block Drv =
+== Floppy ==
+=== Hardware Part ===
+* Driver device nr
+in linux, MAJ_DEV=2, MIN_DEV=TYPE*4+DRIVE, DRIVE only is A-D(0-3).
+%toc TYPE definitions
+| type | Description         |
+|------|---------------------|
+| 0    | not used            |
+| 1    | 360KB PC Driver     |
+| 2    | 1.2MB AT Driver     |
+| 3    | 360KB used in 720KB |
+| 4    | 3.5'' 720KB         |
+| 5    | 360KB used in 1.2MB |
+| 6    | 720KB used in 1.2MB |
+| 7    | 1.44MB              |
+* Driver Controller (FDC)
+%toc FDC port 
+| PORT  | R/W        | Description                 |
+|-------|------------|-----------------------------|
+| 0x3f2 | only write | Digital output register DOR |
+| 0x3f4 | only read  | FDC main status STATUS      |
+| 0x3f5 | R/W        | FDC data DATA               |
+| 0x3f7 | only read  | Digital input register DIR  |
+|       | only write | Disk control register DCR   |
+%toc DOR definitions
+| BIT | MNENEMONES | Description                   |
+|-----|------------|-------------------------------|
+| 7   | MOT_EN3    | enable driver D motor         |
+| 6   | MOT_EN2    | enable driver C motor         |
+| 5   | MOT_EN1    | enable driver B motor         |
+| 4   | MOT_EN0    | enable driver A motor         |
+| 3   | DMA_INT    | 1: enable DMA, 0: disable DMA |
+| 2   | RESET      | let FDC work, 0: reset FDC    |
+| 1   | DRV_SEL1   | 00-11: select driver nr       |
+| 0   | DRV_SEL0   |                               |
+%toc STATUS definitions
+| BIT | MNENEMONES | Description                         |
+|-----|------------|-------------------------------------|
+| 7   | RQM        | DATA port ready                     |
+| 6   | DIR        | Direction, 1: FDC->CPU, 0: CPU->FDC |
+| 5   | NDM        | not DMA mode, 0: no-DMA, 1: DMA     |
+| 4   | CB         | controller busy                     |
+| 3   | DDB        | driver D busy                       |
+| 2   | DCB        | driver C busy                       |
+| 1   | DBB        | driver B busy                       |
+| 0   | DAB        | driver A busy                       |
+%toc DATA register	
+include many registers, one time only one type register occur 
+	- STATUS[DIR]=1, only read RESULT register, when read, only STATUS[CB]=0 means read done, max bytes 7.
+	- STATUS[DIR]=0, only write COMMAND, PARAMETER register
+%toc DIR register
+only bit[7] valid for floppy, stand for disk change status
+%toc DCR register 
+only DCR[1:0] stand for data rate, 00:500kps, 01:300kps, 10:250kps
+* x86 compatible PC
+use IRQ6(IDT[0x26]), DMA2
+* Disk Controller Command list
+controller can accept 15 commands type, each command has 3 phase: command, execute, result.
+	- command: cmd op, 0-8 parameter 
+	- execte: no CPU invoke, two mode, interrupt mode, only 1 byte once; DMA mode, when DMA done, FDC send interrupt to CPU
+	- result: CPU receive 0-7 result data, if no result, send FD_SENSEI to query op result 
+linux only use 6 commands
+- 1. FD_RECALIBRATE
+	recalibrate, set the head back to sector 0
+| PHASE   | SEQ | D7 | D6 | D5 | D4 | D3 | D2 | D1  | D0  | Description             |
+|---------|-----|----|----|----|----|----|----|-----|-----|-------------------------|
+| COMMAND | 0   | 0  | 0  | 0  | 0  | 0  | 1  | 1   | 1   | op code is 0x07         |
+|         | 1   | 0  | 0  | 0  | 0  | 0  | 0  | US1 | US0 | driver nr               |
+| EXECUTE |     |    |    |    |    |    |    |     |     | return head to sector 0 |
+| RESULT  |     |    |    |    |    |    |    |     |     | no result               |
+- 2. FD_SEEK
+	move the head to specific track
+| PHASE   | SEQ | D7 | D6 | D5 | D4 | D3 | D2 | D1  | D0  | Description            |
+|---------|-----|----|----|----|----|----|----|-----|-----|------------------------|
+| COMMAND | 0   | 0  | 0  | 0  | 0  | 1  | 1  | 1   | 1   | op code is 0x0f        |
+|         | 1   | 0  | 0  | 0  | 0  | 0  | HD | US1 | US0 | head nr, driver nr     |
+|         |     |    |    |    |    |    |    |     |     | track nr               |
+| EXECUTE |     |    |    |    |    |    |    |     |     | move to specific track |
+| RESULT  |     |    |    |    |    |    |    |     |     | no result              |
+- 3. FD_READ
+	
+- 4. FD_WRITE
+- 5. FD_SENSEI
+- 6. FD_SPECIFY

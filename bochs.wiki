@@ -1,0 +1,9 @@
+= Compile bochs from source =
+* with bochs internal debug
+    `configure --prefix=<bin-dir> --with-sdl --enable-x86-debugger --enable-x86-64 \`
+        `--enable-smp --enable-debugger --enable-disasm --enable-iodebug --enable-vmx=2 --enable-svm --enable-avx`
+* with GDB with bochs, gdb can't configure with *"--enable-smp"* option
+    `configure --prefix=<bin-dir> --with-sdl --enable-x86-debugger --enable-x86-64 \`
+        `--enable-gdb-stub --enable-disasm --enable-iodebug --enable-vmx=2 --enable-svm --enable-avx`
+
+= Usage = 

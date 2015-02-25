@@ -1,0 +1,18 @@
+= Compile from Source =
+* `sudo aptitude install tcl8.5-dev`
+  `sudo aptitude install tk8.5-dev`
+* `chmod +w bin`
+* `chmod +x src/utils/install-prog`
+* `chmod +x ./configure`
+* `./configure`
+* `make`
+* create a file in <omnetpp-dir>/bin/launch-omnetpp as follow
+    {{{ class="brush:sh"
+        #!/bin/sh 
+        omnetpp_root=/home/hawkwang/opt/omnetpp-4.3.1 
+        export LD_LIBRARY_PATH=$omnetpp_root/lib:$LD_LIBRARY_PATH
+        export HOSTNAME
+        export HOST
+        omnetpp
+    }}}
+
