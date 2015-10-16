@@ -12,4 +12,9 @@
         2. select the "gvim" item, create a subitem "Command", enter default value:
             C:\Program Files (x86)\Vim\vim72\gvim.exe "%1", that's done.
     ref link: http://blog.csdn.net/iamduoluo/article/details/7991321
+* format file 
+    1. `gg=G` to format whole file
+    2. `==` format current line
+    3. in visual mode select and then use `=` to format
+    4. use `n=` to format following n lines 
 

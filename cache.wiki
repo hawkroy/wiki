@@ -1,0 +1,25 @@
+= Cache =
+== Dinero-IV analysis ==
+
+request L1->L2
+1. mob load request, including read-invalid
+2. mob eviction request
+3. mob prefetch request
+4. mob bus write request (WT/WC)
+5. mob WC memory write 
+6. l1i load request
+7. l1i castout request, eviction
+8. bus snoop request 
+
+request L2->L1
+1. query L1
+2. bus load for miss cache
+3. bus store, including L2 eviction, mob WC/WT/UC write
+
+LoadQueue Info:
+    load_request_type
+    L1 fillQ id
+    priority
+    byte enable
+    MemoryTraits
+    load address

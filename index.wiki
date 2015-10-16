@@ -11,6 +11,7 @@
                 * [[qemu]]  --- qemu emulation tricks
                 * [[bochs]] --- bochs x86 Emulator
                 * [[systemc]]  --- systemc discussion
+                * [[cache]] --- cache structure and protocol
             ==== BIOS ====
                 * [[BIOS_EDK2]] --- BIOS edk2 code related
                 * [[AMI BIOS]] --- AMI BIOS
