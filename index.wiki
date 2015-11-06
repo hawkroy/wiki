@@ -11,6 +11,9 @@
                 * [[qemu]]  --- qemu emulation tricks
                 * [[bochs]] --- bochs x86 Emulator
                 * [[systemc]]  --- systemc discussion
+                * [[cache]] --- cache structure and protocol
+                * [[VPI]] --- VIA like Intel QPI protocol
+                * [[PCI]] --- PCI/PCIe Bus related
             ==== BIOS ====
                 * [[BIOS_EDK2]] --- BIOS edk2 code related
                 * [[AMI BIOS]] --- AMI BIOS
@@ -20,7 +23,7 @@
         === Languages ===
             * [[Python]] --- Python Knowledge
             ==== Vim ====
-                * [[Vimwiki]] --- vim wiki memo 
+                * [[Vimwiki]] --- vim wiki memo
                 * [[Vimtip]]  --- vim tips & tricks
         === Algorithms ===
             * [[HDU]] --- HDU OJ report
@@ -30,4 +33,4 @@
         * [[problem-solve]] --- misc problems solution
     == My Project ==
         * [[Tiger]] --- Tiger Language Project
-        * [[Emulator]]  --- a Multi-Program Emulator 
+        * [[Emulator]]  --- a Multi-Program Emulator

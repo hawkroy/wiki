@@ -1,4 +1,4 @@
- = MP Premilitery Knowledge =
+= MP Premilitery Knowledge =
 == 1 MP Basic Structure ==
     MP is Multi Processor abbrv，Figure-1 is a typical Multi Processor Architecture.
           +------------+       +-------------+             +--------------+
@@ -25,12 +25,12 @@
                |  IO APIC   |            |  IO APIC   |         | Shared Memory  |
                |            |            |            |         |                |
                +------------+            +------------+         +----------------+
-                                     
+
                                      Figure-1 Typical MP Architecture
-    
+
     BSP: Bootstrap Processor，startup CPU
     AP: Application Processor，same as BSP except for bootup and shutdown
-    This Architecture is symmetrical system, means sharing memory, using same address space. 
+    This Architecture is symmetrical system, means sharing memory, using same address space.
     Interrupt controlled by LOCAL APIC/ I/O APIC.
 == 2 Common Registers ==
     Table-1 LOCAL APIC Common Registers
@@ -75,7 +75,7 @@
      | Version |  1xH      Local APIC, 14H for P4 and Xeon  |
      | (7-0)   |  0xH      82489DX external APIC            |
      |         |  20H-FFH  Reserved                         |
-     +---------+--------------------------------------------+  
+     +---------+--------------------------------------------+
      | 15-8    |  Reserved                                  |
      +---------+--------------------------------------------+
      | MAX LVTs|  the number of LVT entries minus 1         |
@@ -143,10 +143,10 @@
  1: periodic   \               |           |          \
                                |   +------------------- Remote IRR
                                |   |       |          /
-                  Mask         |   |       |                                          
-                 0: not masked |   |     +-+                                           
+                  Mask         |   |       |
+                 0: not masked |   |     +-+
                  1: masked     |   |     |  Delivery Status
-                               |   |     |   0: idle                                      
+                               |   |     |   0: idle
                                |   |     |   1: send pending
                                |   |     |
                                |   |     |         \
@@ -164,7 +164,7 @@
     31                  17  \|/ |  | |  \|/ 11 10| 8 7         0    others: Reserved
      +-----------------------+--+--+-+---+-------+-------------+
      |     Reserved       |   |  |  |  |   | R |    |  Vector  |
-     +---------------------------------------------------------+                                    
+     +---------------------------------------------------------+
      |     Reserved       |   |  |  |  |   | R |    |  Vector  |
      +---------------------------------------------------------+
      |     Reserved       |   |   R    |   |   R    |  Vector  |
@@ -234,7 +234,6 @@
     # Read and evaluate COUNT and establishes processor count
     # If necessary, reconfigures the APIC and continue with remaining system diagnostics
 === 3.2 AP Initialize Flow ===
-    当AP收到SIPI的信号，开始执行SIPI指定的BIOS的AP初始化代码。
     # Wait on BIOS initialization Lock Semaphore. When control of the semaphore is attained, initialize continues
     # Load the microcode update into processor
     # Initialize the MTTRs (using same mapping that was used for BSP)

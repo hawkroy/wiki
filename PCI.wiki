@@ -1,0 +1,19 @@
+= PCI/PCIe Premilitery Knowledge =
+* PCI Configuration Address Format
+| Enable(31) | Reserved(30-24) | Bus(23-16) | Dev(15-11) | Fun(10-8) | Reg(7-2) | 0 | 0 |
+|------------|-----------------|------------|------------|-----------|----------|---|---|
+
+AD[31:0] mapping to TYPE01 trasanction
+| Reserved(31-24) | Bus(23-16) | Dev(15-11) | Fun(10-8) | Reg(7-2) | 0 | 1 |
+|-----------------|------------|------------|-----------|----------|---|---|
+
+AD[31:0] mapping to TYPE00 trasanction
+| Only One '1' | Fun(10-8) | Reg(7-2) | 0 | 0 |
+|--------------|-----------|----------|---|---|
+
+* PCIe Configuration Address Reg Format
+| PCIe Base Addr[same as base reg](63-28) | Bus(27-20) | Dev(19-15) | Fun(14-12) | Ext Reg(11-8) | Reg(7-2) | Byte Enable(1-0) |
+|-----------------------------------------|------------|------------|------------|---------------|----------|------------------|
+
+so, in UEFI-EDK2 source, use PCIe format as base format, if visit PCI 256-B configuration space, PciLib will translate PCIe format to PCI format
+whether it is a TYPE00 or TYPE01 transaction based on current visited BUS number. ex, if on BUS#1, and visit B1D2F0, then BUS#1 bridge will use TYPE00, if visit child bus device on BUS#1, then will use TYPE01
