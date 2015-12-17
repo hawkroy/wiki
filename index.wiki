@@ -12,7 +12,6 @@
                 * [[bochs]] --- bochs x86 Emulator
                 * [[systemc]]  --- systemc discussion
                 * [[cache]] --- cache structure and protocol
-                * [[VPI]] --- VIA like Intel QPI protocol
                 * [[PCI]] --- PCI/PCIe Bus related
             ==== BIOS ====
                 * [[BIOS_EDK2]] --- BIOS edk2 code related
@@ -34,3 +33,5 @@
     == My Project ==
         * [[Tiger]] --- Tiger Language Project
         * [[Emulator]]  --- a Multi-Program Emulator
+    == Work ==
+        * [[VPI]] --- VIA like Intel QPI protocol
