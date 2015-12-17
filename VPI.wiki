@@ -1,2 +1,27 @@
-= Overview =
+= Function model in Qemu =
+== VPI model design ==
+1. only write VPI model in one design file. not split to other files
+2. the interface between VPI module and Qemu other modules
+    2.1 VPI model .VS. D0F2 pci device
+    2.2 VPI model .VS. Qemu address_space decode(Qemu QSAD)
+=== 2.2 VPI .vs. QSAD ===
+* Call path for QSAD for different transaction type
+1. MMIO/MEM =>  ld/st_fastpath[1]  =>  page_fault  =>  translate_for_iotlb(find_mr_section)[2] \
+            =>  tlb_set_page    =>  ld/st_p(host)/{address_space_translate  =>  MMIO callback}
+2. IO/{ld/st}_phys/DMA  =>  address_space_translate =>  translate_for_iotlb[2] \
+                        =>  ld/st_p(host)/IO callback
+* interface VPI model provided
+    {{{ class="brush:c"
+        int VPIDecode(hwaddr paddr, optype rw, int *io, hw *xlate);
+            paddr   -   GPA of transaction
+            rw      -   type attribute of transaction, marked by R/W
+            io      -   pointer for trasaction type, IO/MEM, mutable
+            xlate   -   pointer for translated GPA, for MEM, if interleave, diff than paddr, otherwise, same
+            return  -   function status, 0=success, other fail
+    }}}
+
+* injection place
+as [[Call path for QSAD]] list, we will inject our VPI model call to QSAD [1] & [2] place, but one question is for [2].
+[2] don't have any r/w attribute, and is re-enter for different transaction type.
+
 
